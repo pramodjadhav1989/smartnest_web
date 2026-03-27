@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 const playStoreUrl =
   "https://play.google.com/store/apps/details?id=com.smartnest&pcampaignid=web_share";
+const societyRegistrationUrl = "https://api.mysmartnest.co.in/v1/society/register";
 
 const featureCards = [
   {
@@ -93,10 +94,9 @@ export default function App() {
     return window.localStorage.getItem("smartnest-theme") || "dark";
   });
   const [activeReview, setActiveReview] = useState(0);
-  const [formMessage, setFormMessage] = useState(
-    "Demo mode: data is currently captured only in the browser.",
-  );
+  const [formMessage, setFormMessage] = useState("");
   const [isSuccess, setIsSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const goToReview = (index) => {
     setActiveReview((index + reviews.length) % reviews.length);
@@ -116,19 +116,73 @@ export default function App() {
     window.localStorage.setItem("smartnest-theme", theme);
   }, [theme]);
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
 
-    const formData = new FormData(event.currentTarget);
-    const payload = Object.fromEntries(formData.entries());
+    const form = event.currentTarget;
+    const formData = new FormData(form);
+    const payload = {
+      societyName: formData.get("societyName")?.toString().trim() ?? "",
+      city: formData.get("city")?.toString().trim() ?? "",
+      address: formData.get("address")?.toString().trim() ?? "",
+      numberOfFlats: formData.get("flats")?.toString().trim() ?? "",
+      contactPerson: formData.get("contactPerson")?.toString().trim() ?? "",
+      phone: formData.get("phone")?.toString().trim() ?? "",
+      email: formData.get("email")?.toString().trim() ?? "",
+    };
 
-    console.log("SmartNest society registration:", payload);
+    setIsSubmitting(true);
+    setFormMessage("");
+    setIsSuccess(false);
 
-    setFormMessage(
-      "Registration captured in demo mode. Connect this form to your backend API to store leads and trigger onboarding.",
-    );
-    setIsSuccess(true);
-    event.currentTarget.reset();
+    try {
+      const response = await fetch(societyRegistrationUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result?.status_code === 200) {
+        setFormMessage(
+          result?.data?.message ||
+            result?.message ||
+            "Society registration submitted successfully.",
+        );
+        setIsSuccess(true);
+        form.reset();
+        return;
+      }
+
+      if (response.status === 400 || result?.status_code === 400) {
+        setFormMessage(
+          result?.message ||
+            "A registration request for this society and city already exists.",
+        );
+        return;
+      }
+
+      if (response.status === 429 || result?.status_code === 429) {
+        setFormMessage(
+          result?.message ||
+            "Too many requests from this IP. Please wait and try again.",
+        );
+        return;
+      }
+
+      setFormMessage(
+        result?.message || "Something went wrong while submitting your registration.",
+      );
+    } catch (error) {
+      setFormMessage(
+        "We could not submit your registration right now. Please try again in a moment.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -371,16 +425,15 @@ export default function App() {
               <span className="pill">Society Registration</span>
               <h2>Register your society with SmartNest</h2>
               <p>
-                This matches the form fields discussed in the shared chat and keeps the
-                page fully static for now, with an easy path to connect your backend
-                later.
+                Share your society details and our team will help you get started with
+                onboarding, setup, and access for your community.
               </p>
 
               <div className="note-card">
-                <strong>Recommended next step</strong>
+                <strong>What happens next</strong>
                 <p>
-                  Connect this form to your backend API and automate admin creation,
-                  flat uploads, and payment onboarding.
+                  Once you submit the form, the SmartNest team can follow up to set up
+                  your admin account, property details, and payment onboarding.
                 </p>
               </div>
             </div>
@@ -422,8 +475,8 @@ export default function App() {
                 </label>
               </div>
 
-              <button className="button submit-button" type="submit">
-                Submit Registration
+              <button className="button submit-button" type="submit" disabled={isSubmitting}>
+                {isSubmitting ? "Submitting..." : "Submit Registration"}
               </button>
               <p className={`form-message${isSuccess ? " success" : ""}`} aria-live="polite">
                 {formMessage}
