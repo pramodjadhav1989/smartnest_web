@@ -6,4 +6,4 @@ services:
     container_name: smartnest-website
     restart: always
     ports:
-      - "4174:80"
+      - "4174:4174"

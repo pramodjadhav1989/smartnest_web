@@ -53,6 +53,6 @@ jobs:
             docker rm smartnest-website || true
             docker run -d \
               --name smartnest-website \
-              -p 4174:80 \
+              -p 4174:4174 \
               --restart always \
               smartpet/smartnest-website:latest
